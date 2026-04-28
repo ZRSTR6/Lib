@@ -1184,47 +1184,14 @@ do
             Parent = Library.KeybindContainer,
         })
 
-        local CheckboxOuter = Library:Create('Frame', {
-            BackgroundColor3 = Color3.new(0, 0, 0),
-            BorderColor3 = Color3.new(0, 0, 0),
-            Position = UDim2.new(0, 2, 0.5, -6),
-            Size = UDim2.new(0, 12, 0, 12),
-            ZIndex = 111,
-            Parent = KeybindEntry,
-        })
-        Library:AddToRegistry(CheckboxOuter, { BorderColor3 = 'Black' }, true)
-
-        local CheckboxInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor,
-            BorderColor3 = Library.OutlineColor,
-            BorderMode = Enum.BorderMode.Inset,
-            Size = UDim2.new(1, 0, 1, 0),
-            ZIndex = 112,
-            Parent = CheckboxOuter,
-        })
-        Library:AddToRegistry(CheckboxInner, {
-            BackgroundColor3 = 'MainColor',
-            BorderColor3 = 'OutlineColor'
-        }, true)
-
         local ContainerLabel = Library:CreateLabel({
-            Position = UDim2.new(0, 20, 0, 0),
-            Size = UDim2.new(1, -20, 1, 0),
+            Position = UDim2.new(0, 2, 0, 0),
+            Size = UDim2.new(1, -4, 1, 0),
             TextSize = Library.FontSize - 1,
             TextXAlignment = Enum.TextXAlignment.Left,
             ZIndex = 111,
             Parent = KeybindEntry,
         }, true)
-
-        KeybindEntry.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-                if KeyPicker.Mode == 'Toggle' then
-                    KeyPicker.Toggled = not KeyPicker.Toggled
-                    KeyPicker:DoClick()
-                    KeyPicker:Update()
-                end
-            end
-        end)
 
         local Modes = Info.Modes or { 'Always', 'Toggle', 'Hold' };
         local ModeButtons = {};
@@ -1277,7 +1244,8 @@ do
 
             local State = KeyPicker:GetState();
 
-            ContainerLabel.Text = string.format('[%s] %s (%s)', KeyPicker.Value, Info.Text, KeyPicker.Mode);
+            local displayKey = (KeyPicker.Value == 'None') and '...' or KeyPicker.Value
+            ContainerLabel.Text = string.format('[%s] %s (%s)', displayKey, Info.Text, KeyPicker.Mode);
             -- KeybindMode filter
             local kbMode = Library.KeybindMode or 'All'
             if kbMode == 'Active' then
@@ -1302,11 +1270,6 @@ do
 
             ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
             Library.RegistryMap[ContainerLabel].Properties.TextColor3 = State and 'AccentColor' or 'FontColor';
-
-            CheckboxInner.BackgroundColor3 = State and Library.AccentColor or Library.MainColor;
-            CheckboxInner.BorderColor3 = State and Library.AccentColorDark or Library.OutlineColor;
-            Library.RegistryMap[CheckboxInner].Properties.BackgroundColor3 = State and 'AccentColor' or 'MainColor';
-            Library.RegistryMap[CheckboxInner].Properties.BorderColor3 = State and 'AccentColorDark' or 'OutlineColor';
 
             local YSize = 0
             local XSize = 0
