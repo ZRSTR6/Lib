@@ -22,11 +22,13 @@ local Options = {};
 
 getgenv().Toggles = Toggles;
 getgenv().Options = Options;
+
 local Library = {
     Registry = {};
     RegistryMap = {};
 
     HudRegistry = {};
+
     FontColor = Color3.fromRGB(255, 255, 255);
     MainColor = Color3.fromRGB(28, 28, 28);
     BackgroundColor = Color3.fromRGB(20, 20, 20);
@@ -35,36 +37,39 @@ local Library = {
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.new(0, 0, 0);
+
     Font = Enum.Font.Code,
+    FontSize = 14, -- 追加: ベーステキストサイズ
 
     OpenedFrames = {};
     DependencyBoxes = {};
 
     Signals = {};
     ScreenGui = ScreenGui;
+
     Toggled = false;
     WireframeDrag = false;
     UseBlur = false;
     BlurSize = 15;
+
     -- Keybind list display mode (settable from main script):
     --   'All'     : show every KeyPicker that has NoUI = false  (default)
     --   'Active'  : show only entries whose GetState() == true
     --   'Toggled' : show entries whose parent Toggle is currently on
     KeybindMode = 'All';
+
     -- Notification configuration (editable from main script)
     NotifyConfig = {
         Alignment = 'Left';
-        -- 'Left' | 'Center' | 'Right'
         BarSide   = 'Left';
-        -- 'Left' | 'Right' | 'Top' | 'Bottom'
         PositionX = 0;
-        -- pixel offset X of NotificationArea
         PositionY = 40;
-        -- pixel offset Y of NotificationArea
     };
 };
+
 -- Separate list for KeyPickers (must NOT be in Library.Registry which expects Instance-based entries)
 Library.KeyPickerList = {};
+
 Library.BlurEffect = Instance.new("BlurEffect")
 Library.BlurEffect.Name = "LinoriaBlur"
 Library.BlurEffect.Size = 0
@@ -89,6 +94,30 @@ function Library:UpdateBlur()
     end
 end
 
+-- 追加: テキストサイズ変更用メソッド
+function Library:SetFontSize(Size)
+    Library.FontSize = Size
+    for _, descendant in pairs(ScreenGui:GetDescendants()) do
+        if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
+            local offset = descendant:GetAttribute("FontSizeOffset")
+            if offset then
+                descendant.TextSize = Size + offset
+            end
+        end
+    end
+    local mobileUI = CoreGui:FindFirstChild("LinoriaMobileUI")
+    if mobileUI then
+        for _, descendant in pairs(mobileUI:GetDescendants()) do
+            if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
+                local offset = descendant:GetAttribute("FontSizeOffset")
+                if offset then
+                    descendant.TextSize = Size + offset
+                end
+            end
+        end
+    end
+end
+
 local RainbowStep = 0
 local Hue = 0
 
@@ -102,6 +131,7 @@ table.insert(Library.Signals, RenderStepped:Connect(function(Delta)
         if Hue > 1 then
             Hue = 0;
         end;
+
         Library.CurrentRainbowHue = Hue;
         Library.CurrentRainbowColor = Color3.fromHSV(Hue, 0.8, 1);
     end
@@ -116,6 +146,7 @@ local function GetPlayersString()
 
     return PlayerList;
 end;
+
 local function GetTeamsString()
     local TeamList = Teams:GetTeams();
     for i = 1, #TeamList do
@@ -125,6 +156,7 @@ local function GetTeamsString()
     
     return TeamList;
 end;
+
 function Library:SafeCallback(f, ...)
     if (not f) then
         return;
@@ -158,6 +190,15 @@ function Library:Create(Class, Properties)
         _Instance[Property] = Value;
     end;
 
+    -- 自動でフォントサイズオフセットを計算して属性に保存
+    if _Instance:IsA("TextLabel") or _Instance:IsA("TextBox") or _Instance:IsA("TextButton") then
+        if Properties.TextSize then
+            _Instance:SetAttribute("FontSizeOffset", Properties.TextSize - Library.FontSize)
+        else
+            _Instance:SetAttribute("FontSizeOffset", 0)
+        end
+    end
+
     return _Instance;
 end;
 
@@ -181,7 +222,7 @@ function Library:CreateLabel(Properties, IsHud)
         BackgroundTransparency = 1;
         Font = Library.Font;
         TextColor3 = Library.FontColor;
-        TextSize = 16;
+        TextSize = Library.FontSize + 2;
         TextStrokeTransparency = 0;
     });
     Library:ApplyTextStroke(_Instance);
@@ -268,7 +309,7 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
-    local X, Y = Library:GetTextBounds(InfoStr, Library.Font, 14);
+    local X, Y = Library:GetTextBounds(InfoStr, Library.Font, Library.FontSize);
     local Tooltip = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor,
         BorderColor3 = Library.OutlineColor,
@@ -283,7 +324,7 @@ function Library:AddToolTip(InfoStr, HoverInstance)
     local Label = Library:CreateLabel({
         Position = UDim2.fromOffset(3, 1),
         Size = UDim2.fromOffset(X, Y);
-        TextSize = 14;
+        TextSize = Library.FontSize;
         Text = InfoStr,
         TextColor3 = Library.FontColor,
         TextXAlignment = Enum.TextXAlignment.Left;
@@ -382,10 +423,12 @@ function Library:GetTextBounds(Text, Font, Size, Resolution)
     local Bounds = TextService:GetTextSize(Text, Size, Font, Resolution or Vector2.new(1920, 1080))
     return Bounds.X, Bounds.Y
 end;
+
 function Library:GetDarkerColor(Color)
     local H, S, V = Color3.toHSV(Color);
     return Color3.fromHSV(H, S, V / 1.5);
 end;
+
 Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
 
 function Library:AddToRegistry(Instance, Properties, IsHud)
@@ -403,6 +446,7 @@ function Library:AddToRegistry(Instance, Properties, IsHud)
         table.insert(Library.HudRegistry, Data);
     end;
 end;
+
 function Library:RemoveFromRegistry(Instance)
     local Data = Library.RegistryMap[Instance];
 
@@ -633,7 +677,7 @@ do
             PlaceholderText = 'Hex color',
             Text = '#FFFFFF',
             TextColor3 = Library.FontColor;
-            TextSize = 14;
+            TextSize = Library.FontSize;
             TextStrokeTransparency = 0;
             TextXAlignment = Enum.TextXAlignment.Left;
             ZIndex = 20,
@@ -693,7 +737,7 @@ do
             Size = UDim2.new(1, 0, 0, 14);
             Position = UDim2.fromOffset(5, 5);
             TextXAlignment = Enum.TextXAlignment.Left;
-            TextSize = 14;
+            TextSize = Library.FontSize;
             Text = ColorPicker.Title,
             TextWrapped = false;
             ZIndex = 16;
@@ -705,7 +749,6 @@ do
             ContextMenu.Container = Library:Create('Frame', {
                 BorderColor3 = Color3.new(),
                 ZIndex = 14,
-
                 Visible = false,
                 Parent = ScreenGui
             })
@@ -777,7 +820,7 @@ do
                 local Button = Library:CreateLabel({
                     Active = false;
                     Size = UDim2.new(1, 0, 0, 15);
-                    TextSize = 13;
+                    TextSize = Library.FontSize - 1;
                     Text = Str;
                     ZIndex = 16;
                     Parent = self.Inner;
@@ -1099,7 +1142,7 @@ do
         });
         local DisplayLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
-            TextSize = 13;
+            TextSize = Library.FontSize - 1;
             Text = Info.Default;
             TextWrapped = true;
             ZIndex = 8;
@@ -1167,7 +1210,7 @@ do
         local ContainerLabel = Library:CreateLabel({
             Position = UDim2.new(0, 20, 0, 0),
             Size = UDim2.new(1, -20, 1, 0),
-            TextSize = 13,
+            TextSize = Library.FontSize - 1,
             TextXAlignment = Enum.TextXAlignment.Left,
             ZIndex = 111,
             Parent = KeybindEntry,
@@ -1191,7 +1234,7 @@ do
             local Label = Library:CreateLabel({
                 Active = false;
                 Size = UDim2.new(1, 0, 0, 15);
-                TextSize = 13;
+                TextSize = Library.FontSize - 1;
                 Text = Mode;
                 ZIndex = 16;
                 Parent = ModeSelectInner;
@@ -1530,7 +1573,7 @@ do
 
         local TextLabel = Library:CreateLabel({
             Size = UDim2.new(1, -4, 0, 15);
-            TextSize = 14;
+            TextSize = Library.FontSize;
             Text = Text;
             TextWrapped = DoesWrap or false,
             TextXAlignment = Enum.TextXAlignment.Left;
@@ -1538,7 +1581,7 @@ do
             Parent = Container;
         });
         if DoesWrap then
-            local Y = select(2, Library:GetTextBounds(Text, Library.Font, 14, Vector2.new(TextLabel.AbsoluteSize.X, math.huge)))
+            local Y = select(2, Library:GetTextBounds(Text, Library.Font, Library.FontSize, Vector2.new(TextLabel.AbsoluteSize.X, math.huge)))
             TextLabel.Size = UDim2.new(1, -4, 0, Y)
         else
             Library:Create('UIListLayout', {
@@ -1556,7 +1599,7 @@ do
             TextLabel.Text = Text
 
             if DoesWrap then
-                local Y = select(2, Library:GetTextBounds(Text, Library.Font, 14, Vector2.new(TextLabel.AbsoluteSize.X, math.huge)))
+                local Y = select(2, Library:GetTextBounds(Text, Library.Font, Library.FontSize, Vector2.new(TextLabel.AbsoluteSize.X, math.huge)))
                 TextLabel.Size = UDim2.new(1, -4, 0, Y)
             end
 
@@ -1611,7 +1654,7 @@ do
             });
             local Label = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 1, 0);
-                TextSize = 14;
+                TextSize = Library.FontSize;
                 Text = Button.Text;
                 ZIndex = 6;
                 Parent = Inner;
@@ -1730,7 +1773,7 @@ do
             function SubButton:AddTooltip(tooltip)
                 if type(tooltip) == 'string' then
                     Library:AddToolTip(tooltip, self.Outer)
-                end
+                 end
                 return SubButton
             end
 
@@ -1802,7 +1845,7 @@ do
 
         local InputLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 0, 15);
-            TextSize = 14;
+            TextSize = Library.FontSize;
             Text = Info.Text;
             TextXAlignment = Enum.TextXAlignment.Left;
             ZIndex = 5;
@@ -1869,7 +1912,7 @@ do
 
             Text = Info.Default or '';
             TextColor3 = Library.FontColor;
-            TextSize = 14;
+            TextSize = Library.FontSize;
             TextStrokeTransparency = 0;
             TextXAlignment = Enum.TextXAlignment.Left;
 
@@ -1996,7 +2039,7 @@ do
         local ToggleLabel = Library:CreateLabel({
             Size = UDim2.new(0, 216, 1, 0);
             Position = UDim2.new(1, 6, 0, 0);
-            TextSize = 14;
+            TextSize = Library.FontSize;
             Text = Info.Text;
             TextXAlignment = Enum.TextXAlignment.Left;
             ZIndex = 6;
@@ -2103,7 +2146,7 @@ do
         if not Info.Compact then
             Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 10);
-                TextSize = 14;
+                TextSize = Library.FontSize;
                 Text = Info.Text;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 TextYAlignment = Enum.TextYAlignment.Bottom;
@@ -2160,7 +2203,7 @@ do
         });
         local DisplayLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
-            TextSize = 14;
+            TextSize = Library.FontSize;
             Text = 'Infinite';
             ZIndex = 9;
             Parent = SliderInner;
@@ -2233,6 +2276,7 @@ do
 
                     local nValue = Slider:GetValueFromXOffset(nX);
                     local OldValue = Slider.Value;
+    
                     Slider.Value = nValue;
 
                     Slider:Display();
@@ -2302,7 +2346,7 @@ do
         if not Info.Compact then
             local DropdownLabel = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 10);
-                TextSize = 14;
+                TextSize = Library.FontSize;
                 Text = Info.Text;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 TextYAlignment = Enum.TextYAlignment.Bottom;
@@ -2361,7 +2405,7 @@ do
         local ItemList = Library:CreateLabel({
             Position = UDim2.new(0, 5, 0, 0);
             Size = UDim2.new(1, -5, 1, 0);
-            TextSize = 14;
+            TextSize = Library.FontSize;
             Text = '--';
             TextXAlignment = Enum.TextXAlignment.Left;
             TextWrapped = true;
@@ -2497,7 +2541,7 @@ do
                     Active = false;
                     Size = UDim2.new(1, -6, 1, 0);
                     Position = UDim2.new(0, 6, 0, 0);
-                    TextSize = 14;
+                    TextSize = Library.FontSize;
                     Text = Value;
                     TextXAlignment = Enum.TextXAlignment.Left;
                     ZIndex = 25;
@@ -2853,7 +2897,7 @@ do
     local WatermarkLabel = Library:CreateLabel({
         Position = UDim2.new(0, 5, 0, 0);
         Size = UDim2.new(1, -4, 1, 0);
-        TextSize = 14;
+        TextSize = Library.FontSize;
         TextXAlignment = Enum.TextXAlignment.Left;
         ZIndex = 203;
         Parent = InnerFrame;
@@ -2926,8 +2970,6 @@ do
     Library:MakeDraggable(KeybindOuter);
 end;
 
--- Set keybind list display mode: 'All' | 'Active' | 'Toggled'
--- After calling this, call Library:RefreshKeybinds() to apply immediately.
 function Library:SetKeybindMode(Mode)
     assert(Mode == 'All' or Mode == 'Active' or Mode == 'Toggled',
         "SetKeybindMode: Mode must be 'All', 'Active', or 'Toggled'")
@@ -2935,7 +2977,6 @@ function Library:SetKeybindMode(Mode)
     Library:RefreshKeybinds()
 end
 
--- Force-update every KeyPicker's Visible state and resize the frame.
 function Library:RefreshKeybinds()
     for _, kp in ipairs(Library.KeyPickerList) do
         if not kp.NoUI then
@@ -2949,7 +2990,7 @@ function Library:SetWatermarkVisibility(Bool)
 end;
 
 function Library:SetWatermark(Text)
-    local X, Y = Library:GetTextBounds(Text, Library.Font, 14);
+    local X, Y = Library:GetTextBounds(Text, Library.Font, Library.FontSize);
     Library.Watermark.Size = UDim2.new(0, X + 15, 0, (Y * 1.5) + 3);
     Library:SetWatermarkVisibility(true)
 
@@ -2957,32 +2998,28 @@ function Library:SetWatermark(Text)
 end;
 function Library:Notify(Text, Time)
     local cfg     = Library.NotifyConfig
-    local barSide = cfg.BarSide   or 'Left'    -- 'Left'|'Right'|'Top'|'Bottom'
-    local align   = cfg.Alignment or 'Left'    -- 'Left'|'Center'|'Right'
+    local barSide = cfg.BarSide   or 'Left'    
+    local align   = cfg.Alignment or 'Left'    
 
-    local XSize, YSize = Library:GetTextBounds(Text, Library.Font, 14)
+    local XSize, YSize = Library:GetTextBounds(Text, Library.Font, Library.FontSize)
     YSize = YSize + 7
 
-    -- Bar thickness constants
-    local BAR_THIN  = 3   -- Left / Right bar width
-    local BAR_THICK = 3   -- Top  / Bottom bar height
+    local BAR_THIN  = 3   
+    local BAR_THICK = 3   
 
-    -- Inner frame insets depend on bar side
     local innerPosX  = (barSide == 'Left')   and 1 or 1
     local innerPosY  = (barSide == 'Top')    and BAR_THICK or 1
     local innerSizeW = (barSide == 'Left' or barSide == 'Right') and -2 or -2
     local innerSizeH = (barSide == 'Top' or barSide == 'Bottom') and -(BAR_THICK + 1) or -2
 
-    -- Label insets: leave room for Left/Right bar
     local labelPosX  = (barSide == 'Left')  and BAR_THIN + 2 or 4
     local labelSizeW = (barSide == 'Left' or barSide == 'Right') and -(BAR_THIN + 4) or -4
 
-    -- Outer frame: AnchorPoint for Center alignment
     local outerAnchor = Vector2.new(0, 0)
     local outerPosX   = 0
     if align == 'Center' then
         outerAnchor = Vector2.new(0.5, 0)
-        outerPosX   = 0  -- the area itself is full width; centre anchor handles the rest
+        outerPosX   = 0  
     elseif align == 'Right' then
         outerAnchor = Vector2.new(1, 0)
         outerPosX   = 0
@@ -3043,11 +3080,10 @@ function Library:Notify(Text, Time)
         TextXAlignment = (align == 'Center')
             and Enum.TextXAlignment.Center
             or  Enum.TextXAlignment.Left;
-        TextSize = 14;
+        TextSize = Library.FontSize;
         ZIndex   = 103;
         Parent   = InnerFrame;
     });
-    -- ── Accent bar (position determined by BarSide) ──────────────
     local AccentBar = Library:Create('Frame', {
         BackgroundColor3 = Library.AccentColor;
         BorderSizePixel  = 0;
@@ -3071,7 +3107,6 @@ function Library:Notify(Text, Time)
     Library:AddToRegistry(AccentBar, {
         BackgroundColor3 = 'AccentColor';
     }, true);
-    -- Tween open
     local finalWidth = XSize + 8 + 4
     if barSide == 'Left' or barSide == 'Right' then
         finalWidth = finalWidth + BAR_THIN
@@ -3182,7 +3217,6 @@ function Library:CreateWindow(...)
     end)
 
 
-    -- ── Tab bar (独立フレーム) ─────────────────────────────────
     local TabBarOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
@@ -3219,7 +3253,6 @@ function Library:CreateWindow(...)
         SortOrder = Enum.SortOrder.LayoutOrder;
         Parent = TabArea;
     });
-    -- ── Content area (独立フレーム、タブバーの4px下) ─────────
     local MainSectionOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
@@ -3265,7 +3298,7 @@ function Library:CreateWindow(...)
             Tabboxes = {};
         };
 
-        local TabButtonWidth = Library:GetTextBounds(Name, Library.Font, 16);
+        local TabButtonWidth = Library:GetTextBounds(Name, Library.Font, Library.FontSize + 2);
         local TabButton = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
             BorderColor3 = Library.OutlineColor;
@@ -3295,7 +3328,6 @@ function Library:CreateWindow(...)
         });
         Library:AddToRegistry(TabIndicator, { BackgroundColor3 = 'AccentColor' });
 
-        -- Blocker removed: tab bar and content are now separate frames
         local Blocker = Library:Create('Frame', {
             BackgroundTransparency = 1;
             Size = UDim2.new(0, 0, 0, 0);
@@ -3415,7 +3447,7 @@ function Library:CreateWindow(...)
             local GroupboxLabel = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 18);
                 Position = UDim2.new(0, 4, 0, 2);
-                TextSize = 14;
+                TextSize = Library.FontSize;
                 Text = Info.Name;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 ZIndex = 5;
@@ -3528,7 +3560,7 @@ function Library:CreateWindow(...)
                 });
                 local ButtonLabel = Library:CreateLabel({
                     Size = UDim2.new(1, 0, 1, 0);
-                    TextSize = 14;
+                    TextSize = Library.FontSize;
                     Text = Name;
                     TextXAlignment = Enum.TextXAlignment.Center;
                     ZIndex = 7;
@@ -3717,9 +3749,14 @@ function Library:CreateWindow(...)
         end
     end
 
+    -- 変更点: Menu Keybindが文字列でも設定できるように対応
     Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
         if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
             if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind.Value then
+                task.spawn(Library.Toggle)
+            end
+        elseif type(Library.ToggleKeybind) == 'string' then
+            if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind then
                 task.spawn(Library.Toggle)
             end
         elseif Input.KeyCode == Enum.KeyCode.RightControl or (Input.KeyCode == Enum.KeyCode.RightShift and (not Processed)) then
@@ -3752,12 +3789,10 @@ if InputService.TouchEnabled then
     ProtectGui(MobileGui)
     MobileGui.Parent = CoreGui
 
-    -- ボタンサイズ（画像に合わせて少しコンパクトに）
     local BTN_W, BTN_H = 88, 30
-    local BTN_GAP      = 40  -- ボタン間隔
+    local BTN_GAP      = 40  
 
     local function CreateMobileButton(name, text, startPos)
-        -- 外枠：一番外側の細いアウトライン
         local Outer = Library:Create('Frame', {
             Name             = name .. "Outer",
             BackgroundColor3 = Library.OutlineColor,
@@ -3770,7 +3805,6 @@ if InputService.TouchEnabled then
         })
         Library:AddToRegistry(Outer, { BackgroundColor3 = 'OutlineColor' })
 
-        -- アクセントカラーの枠（アウトラインの1px内側）
         local AccentFrame = Library:Create('Frame', {
             Name             = name .. "Accent",
             BackgroundColor3 = Library.AccentColor,
@@ -3782,7 +3816,6 @@ if InputService.TouchEnabled then
         })
         Library:AddToRegistry(AccentFrame, { BackgroundColor3 = 'AccentColor' })
 
-        -- 内枠：黒背景（アクセントカラーのさらに1px内側）
         local Inner = Library:Create('Frame', {
             Name             = name .. "Inner",
             BackgroundColor3 = Color3.fromRGB(8, 8, 12),
@@ -3793,10 +3826,9 @@ if InputService.TouchEnabled then
             Parent           = AccentFrame,
         })
 
-        -- めちゃくちゃ優しく白いグラデーションを追加 (透明度のグラデーションを利用)
         local GradientOverlay = Library:Create('Frame', {
             Name             = name .. "Gradient",
-            BackgroundColor3 = Color3.new(1, 1, 1), -- 白
+            BackgroundColor3 = Color3.new(1, 1, 1), 
             BorderSizePixel  = 0,
             Size             = UDim2.new(1, 0, 1, 0),
             ZIndex           = 303,
@@ -3804,14 +3836,13 @@ if InputService.TouchEnabled then
         })
         Library:Create('UIGradient', {
             Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.90), -- 上の方は少しだけ白く (10%の不透明度)
-                NumberSequenceKeypoint.new(1, 1.0)   -- 下の方は完全に透明
+                NumberSequenceKeypoint.new(0, 0.90), 
+                NumberSequenceKeypoint.new(1, 1.0)   
             }),
             Rotation = 90,
             Parent = GradientOverlay,
         })
 
-        -- テキストボタン（等幅フォント・白テキスト）
         local Btn = Library:Create('TextButton', {
             Name                = name .. "Btn",
             BackgroundTransparency = 1,
@@ -3819,7 +3850,7 @@ if InputService.TouchEnabled then
             Font                = Enum.Font.Code,
             Text                = text,
             TextColor3          = Color3.fromRGB(255, 255, 255),
-            TextSize            = 13,
+            TextSize            = Library.FontSize - 1,
             ZIndex              = 304,
             Parent              = Inner,
             Active              = true,
@@ -3829,7 +3860,7 @@ if InputService.TouchEnabled then
     end
 
     local ToggleOuter, ToggleBtn = CreateMobileButton("Toggle", "Toggle UI",  UDim2.new(0, 10, 0, 10))
-    local LockOuter,   LockBtn   = CreateMobileButton("Lock",   "Unlock UI",  UDim2.new(0, 10, 0, 10 + BTN_H + (BTN_GAP - BTN_H)))
+    local LockOuter,   LockBtn  = CreateMobileButton("Lock",   "Unlock UI",  UDim2.new(0, 10, 0, 10 + BTN_H + (BTN_GAP - BTN_H)))
 
     local IsUnlocked = false
 
@@ -3885,17 +3916,14 @@ if InputService.TouchEnabled then
     BindMobileButtonAction(LockBtn, LockOuter, function()
         IsUnlocked = not IsUnlocked
         LockBtn.Text = IsUnlocked and "Lock UI" or "Unlock UI"
-        -- アンロック中はテキストをアクセントカラーに
         LockBtn.TextColor3 = IsUnlocked
             and Library.AccentColor
             or  Color3.fromRGB(255, 255, 255)
     end)
 
-    -- テーマ更新時に外枠のアクセントカラーを同期
     local _origUpdate = Library.UpdateColorsUsingRegistry
     Library.UpdateColorsUsingRegistry = function(self)
         _origUpdate(self)
-        -- Outer の BackgroundColor3 は Registry 経由で自動更新される
     end
 end
 
