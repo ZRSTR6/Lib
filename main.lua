@@ -1073,11 +1073,19 @@ do
         Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
                 local AbsPos, AbsSize = PickerFrameOuter.AbsolutePosition, PickerFrameOuter.AbsoluteSize;
+                -- Fix: Use DisplayFrame's actual AbsolutePosition instead of hardcoded -20 offset.
+                -- This prevents the 3rd color picker from conflicting with the Toggle button click area.
+                local DFPos = DisplayFrame.AbsolutePosition;
+                local DFSize = DisplayFrame.AbsoluteSize;
 
                 if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
-                    or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
+                    or Mouse.Y < DFPos.Y or Mouse.Y > AbsPos.Y + AbsSize.Y then
 
-                    ColorPicker:Hide();
+                    -- Only hide if mouse is NOT over the DisplayFrame itself (which handles its own toggle)
+                    if not (Mouse.X >= DFPos.X and Mouse.X <= DFPos.X + DFSize.X
+                        and Mouse.Y >= DFPos.Y and Mouse.Y <= DFPos.Y + DFSize.Y) then
+                        ColorPicker:Hide();
+                    end
                 end;
 
                 if not Library:IsMouseOverFrame(ContextMenu.Container) then
@@ -1092,6 +1100,26 @@ do
             end
         end))
 
+        -- 追加: 透明度を取得するメソッド
+        -- 使い方: Options['MyColor']:GetTransparency() → 0.0〜1.0の数値を返す
+        function ColorPicker:GetTransparency()
+            return ColorPicker.Transparency;
+        end;
+
+        -- 追加: 透明度変更時のコールバックを設定するメソッド
+        -- 使い方: Options['MyColor']:OnTransparencyChanged(function(alpha) ... end)
+        function ColorPicker:OnTransparencyChanged(Func)
+            ColorPicker.TransparencyChanged = Func;
+            Func(ColorPicker.Transparency);
+        end;
+
+        -- 透明度コールバック呼び出しをDisplay()にフック
+        local _OrigDisplay = ColorPicker.Display;
+        ColorPicker.Display = function(self)
+            _OrigDisplay(self);
+            Library:SafeCallback(ColorPicker.TransparencyChanged, ColorPicker.Transparency);
+        end;
+
         ColorPicker:Display();
         ColorPicker.DisplayFrame = DisplayFrame
 
@@ -1099,6 +1127,18 @@ do
 
         return self;
     end;
+
+    -- 追加: 透明度バー付きカラーピッカーを追加するエイリアス関数
+    -- Info.Transparency に初期透明度を 0.0〜1.0 で指定（省略時は 0 = 不透明）
+    -- 使い方: Toggle:AddColorPickerAlpha('MyColor', { Default = Color3.fromRGB(255,0,0), Title = '色', Transparency = 0 })
+    function Funcs:AddColorPickerAlpha(Idx, Info)
+        Info = Info or {};
+        if Info.Transparency == nil then
+            Info.Transparency = 0;
+        end;
+        return Funcs.AddColorPicker(self, Idx, Info);
+    end;
+
     function Funcs:AddKeyPicker(Idx, Info)
         local ParentObj = self;
         local ToggleLabel = self.TextLabel;
